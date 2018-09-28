@@ -41,8 +41,8 @@ class AVFile():
         self.height = int(self.width / video_width * video_height)
 
         self.handle.write(self.width.to_bytes(1, byteorder='big'))
-        self.handle.write(self.height.to_bytes(1 byteorder='big'))
-        self.handle.write(self.frame_count.to_bytes(3 byteorder='big'))
+        self.handle.write(self.height.to_bytes(1, byteorder='big'))
+        self.handle.write(self.frame_count.to_bytes(3, byteorder='big'))
 
         for i in range(1, self.frame_count + 1):
             if self.debug:
