@@ -54,8 +54,8 @@ class AVFile():
 
         self.frame_count = len(os.listdir('images'))
         video_width, video_height = Image.open('images/000001.jpg').size
-        self.width = 120
-        self.height = int(self.width / video_width * video_height)
+        self.width = 180
+        self.height = int(self.width / video_width * video_height / 1.5)
 
         self.write_int(self.width, 1)
         self.write_int(self.height, 1)
