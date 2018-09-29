@@ -10,7 +10,7 @@ from PIL import Image
 class AVFile():
     def __init__(self, filename, mode, debug=False):
         '''
-        Signature Width Height Frame_Count Data
+        Signature Width Height Frame_Count FPS Data
         '''
         self.grayscale = '$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,"^`\'. '
         self.filename = filename.rsplit('.', 1)[0]
@@ -19,14 +19,15 @@ class AVFile():
         self.handle = open(self.filename + '.avf', mode + 'b')
 
         if mode == 'r':
-            self.signature = self.handle.read(3).decode('utf-8')
-            self.width = int.from_bytes(self.handle.read(1), byteorder='big')
-            self.height = int.from_bytes(self.handle.read(1), byteorder='big')
-            self.frame_count = int.from_bytes(self.handle.read(3), byteorder='big')
+            self.signature = self.read_str(3)
+            self.width = self.read_int(1)
+            self.height = self.read_int(1)
+            self.frame_count = self.read_int(3)
+            self.fps = self.read_int(1)
 
         if mode == 'w':
             self.signature = 'AVF'
-            self.handle.write(self.signature.encode())
+            self.write_str(self.signature)
             self.create_ascii_video(self.filename)
 
     def extract_images(self, video):
@@ -36,7 +37,17 @@ class AVFile():
         if os.path.exists('images'):
             shutil.rmtree('images')
         os.makedirs('images')
-        subprocess.call(['ffmpeg', '-i', video + '.mp4', 'images/%06d.jpg'])
+
+        log = 'ffmpeg.log'
+        with open(log, 'w') as f:
+            subprocess.call(['ffmpeg', '-i', video + '.mp4', 'images/%06d.jpg'], stdout=f, stderr=subprocess.STDOUT)
+
+        self.fps = 60
+        with open(log, 'r') as f:
+            output = f.read()
+            self.fps = round(float(output[:output.index('fps') - 1].rsplit(' ', 1)[1]))
+
+        os.remove(log)
 
     def create_ascii_video(self, video):
         self.extract_images(video)
@@ -46,9 +57,10 @@ class AVFile():
         self.width = 120
         self.height = int(self.width / video_width * video_height)
 
-        self.handle.write(self.width.to_bytes(1, byteorder='big'))
-        self.handle.write(self.height.to_bytes(1, byteorder='big'))
-        self.handle.write(self.frame_count.to_bytes(3, byteorder='big'))
+        self.write_int(self.width, 1)
+        self.write_int(self.height, 1)
+        self.write_int(self.frame_count, 3)
+        self.write_int(self.fps, 1)
 
         for i in range(1, self.frame_count + 1):
             if self.debug:
@@ -56,14 +68,26 @@ class AVFile():
             image = Image.open('images/{0:06d}.jpg'.format(i)).convert('L').resize((self.width, self.height), Image.LANCZOS)
             for h in range(self.height):
                 for w in range(self.width):
-                    self.handle.write(self.grayscale[int(image.getpixel((w, h)) * 69 / 255)].encode())
+                    self.write_str(self.grayscale[int(image.getpixel((w, h)) * 69 / 255)])
 
     def play(self):
         for i in range(self.frame_count):
             frame = self.handle.read(self.width * self.height).decode('utf-8')
             for r in range(0, len(frame), self.width):
                 print(frame[r:r + self.width])
-            time.sleep(0.001)
+            time.sleep(1.0 / self.fps)
+
+    def read_str(self, n):
+        return self.handle.read(n).decode('utf-8')
+
+    def read_int(self, n):
+        return int.from_bytes(self.handle.read(n), byteorder='big')
+
+    def write_str(self, data):
+        self.handle.write(data.encode())
+
+    def write_int(self, data, n):
+        self.handle.write(data.to_bytes(n, byteorder='big'))
 
     def close(self):
         if os.path.exists('images'):
@@ -75,7 +99,7 @@ if __name__ == '__main__':
     filename = sys.argv[2]
 
     if command == 'create':
-        avf = AVFile(filename, 'w', True)
+        avf = AVFile(filename, 'w')
         avf.close()
 
     elif command == 'play':
