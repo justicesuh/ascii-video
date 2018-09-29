@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 
 from PIL import Image
 
@@ -15,13 +16,18 @@ class AVFile():
         self.filename = filename.rsplit('.', 1)[0]
         self.mode = mode
         self.debug = debug
-        self.handle = open(filename + '.avf', mode + 'b')
+        self.handle = open(self.filename + '.avf', mode + 'b')
+
+        if mode == 'r':
+            self.signature = self.handle.read(3).decode('utf-8')
+            self.width = int.from_bytes(self.handle.read(1), byteorder='big')
+            self.height = int.from_bytes(self.handle.read(1), byteorder='big')
+            self.frame_count = int.from_bytes(self.handle.read(3), byteorder='big')
 
         if mode == 'w':
             self.signature = 'AVF'
             self.handle.write(self.signature.encode())
-
-        self.create_ascii_video(self.filename)
+            self.create_ascii_video(self.filename)
 
     def extract_images(self, video):
         '''
@@ -52,8 +58,16 @@ class AVFile():
                 for w in range(self.width):
                     self.handle.write(self.grayscale[int(image.getpixel((w, h)) * 69 / 255)].encode())
 
+    def play(self):
+        for i in range(self.frame_count):
+            frame = self.handle.read(self.width * self.height).decode('utf-8')
+            for r in range(0, len(frame), self.width):
+                print(frame[r:r + self.width])
+            time.sleep(0.001)
+
     def close(self):
-        shutil.rmtree('images')
+        if os.path.exists('images'):
+            shutil.rmtree('images')
         self.handle.close()
 
 if __name__ == '__main__':
@@ -65,4 +79,6 @@ if __name__ == '__main__':
         avf.close()
 
     elif command == 'play':
-        pass
+        avf = AVFile(filename, 'r', True)
+        avf.play()
+        avf.close()
